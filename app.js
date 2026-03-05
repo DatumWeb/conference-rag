@@ -344,9 +344,14 @@ async function checkSearchReadiness() {
                     body: { question: 'test' }
                 });
                 semanticReady = !fnError;
-            } catch {
-                // CORS or network error → function not deployed
+                if (fnError) {
+                    console.warn('[Semantic readiness] embed-question failed:', fnError.message, fnError.context?.status, data?.error);
+                }
+            } catch (e) {
+                console.warn('[Semantic readiness] embed-question exception:', e.message);
             }
+        } else {
+            console.warn('[Semantic readiness] Skipped embed-question check: no rows with embeddings in DB (hasData=', hasData, ')');
         }
         setSearchReady('semantic', semanticReady);
 
