@@ -84,6 +84,11 @@ const ragBtn = document.getElementById('rag-btn');
 const ragResults = document.getElementById('rag-results');
 const ragStatus = document.getElementById('rag-status');
 
+const doctrineOpinionInput = document.getElementById('doctrine-opinion-input');
+const doctrineOpinionBtn = document.getElementById('doctrine-opinion-btn');
+const doctrineOpinionResults = document.getElementById('doctrine-opinion-results');
+const doctrineOpinionStatus = document.getElementById('doctrine-opinion-status');
+
 // ============================================
 // SETUP BANNER DETECTION
 // ============================================
@@ -358,6 +363,7 @@ async function checkSearchReadiness() {
         // --- 1 generate-answer call (only if semantic pipeline is ready) ---
         if (!semanticReady) {
             setSearchReady('rag', false);
+            setSearchReady('doctrine-opinion', false);
         } else {
             try {
                 const { data, error: fnError } = await supabaseClient.functions.invoke('generate-answer', {
@@ -367,12 +373,21 @@ async function checkSearchReadiness() {
             } catch {
                 setSearchReady('rag', false);
             }
+            try {
+                const { error: fnError } = await supabaseClient.functions.invoke('classify-doctrine-or-opinion', {
+                    body: { statement: 'test', context_talks: [] }
+                });
+                setSearchReady('doctrine-opinion', !fnError || fnError.context?.status !== 404);
+            } catch {
+                setSearchReady('doctrine-opinion', false);
+            }
         }
     } catch (err) {
         console.log('Readiness check failed:', err.message);
         setSearchReady('keyword', false);
         setSearchReady('semantic', false);
         setSearchReady('rag', false);
+        setSearchReady('doctrine-opinion', false);
     } finally {
         readinessCheckRunning = false;
     }
@@ -585,6 +600,62 @@ async function askQuestion() {
 }
 
 // ============================================
+// DOCTRINE OR OPINION?
+// ============================================
+
+async function doctrineOpinionSearch() {
+    const statement = doctrineOpinionInput ? doctrineOpinionInput.value.trim() : '';
+    if (!statement || !supabaseClient) return;
+
+    showLoading(true);
+    clearResults('doctrine-opinion');
+
+    try {
+        const embedding = await getEmbedding(statement);
+        const results = await searchSentences(embedding);
+        const topTalks = groupByTalk(results);
+        const enrichedTalks = await fetchFullTalkText(topTalks);
+
+        const answer = await classifyDoctrineOrOpinion(statement, enrichedTalks);
+
+        const overallSimilarity = topTalks.length
+            ? topTalks.reduce((sum, t) => sum + t.avgSimilarity, 0) / topTalks.length
+            : 0;
+        const overallBadge = similarityBadge(overallSimilarity);
+        const simClass = overallSimilarity >= 0.70 ? 'similarity-high'
+            : overallSimilarity >= 0.40 ? 'similarity-mid' : 'similarity-low';
+
+        let html = `<div class="result-card rag-answer rag-${simClass}">
+            <div class="result-card-header">
+                <div class="result-title">Doctrine or Opinion?</div>
+                ${overallBadge}
+            </div>
+            <div class="result-sentences">${escapeHtml(answer).replace(/\n/g, '<br>')}</div>
+        </div>`;
+
+        html += '<div class="result-sources"><strong>Referenced talks:</strong></div>';
+        for (const talk of topTalks) {
+            const talkBadge = similarityBadge(talk.avgSimilarity);
+            html += `<div class="result-card result-source">
+                <div class="result-card-header">
+                    <div>
+                        <div class="result-title"><a href="${escapeHtml(talk.url)}" target="_blank" class="result-title-link">${escapeHtml(talk.title)}</a></div>
+                        <div class="result-speaker">by ${escapeHtml(talk.speaker)}</div>
+                    </div>
+                    ${talkBadge}
+                </div>
+            </div>`;
+        }
+        showResults('doctrine-opinion', html);
+
+    } catch (error) {
+        showResults('doctrine-opinion', `<div class="result-error">Error: ${escapeHtml(error.message)}</div>`);
+    } finally {
+        showLoading(false);
+    }
+}
+
+// ============================================
 // SHARED SEARCH UTILITIES
 // ============================================
 
@@ -685,6 +756,22 @@ async function fetchFullTalkText(talks) {
     }));
 }
 
+// Classify statement as doctrine vs opinion via Edge Function
+async function classifyDoctrineOrOpinion(statement, contextTalks) {
+    const { data, error } = await supabaseClient.functions.invoke('classify-doctrine-or-opinion', {
+        body: {
+            statement: statement,
+            context_talks: contextTalks
+        }
+    });
+
+    if (error) {
+        throw new Error(data?.error || 'Failed to classify');
+    }
+
+    return data.answer;
+}
+
 // Generate answer via Edge Function
 async function generateAnswer(question, contextTalks) {
     const { data, error } = await supabaseClient.functions.invoke('generate-answer', {
@@ -755,6 +842,12 @@ if (semanticInput) semanticInput.addEventListener('keypress', (e) => {
 if (ragBtn) ragBtn.addEventListener('click', askQuestion);
 if (ragInput) ragInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') askQuestion();
+});
+
+// Doctrine or Opinion
+if (doctrineOpinionBtn) doctrineOpinionBtn.addEventListener('click', doctrineOpinionSearch);
+if (doctrineOpinionInput) doctrineOpinionInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') doctrineOpinionSearch();
 });
 
 // ============================================

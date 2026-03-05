@@ -132,6 +132,20 @@
                     </div>
                     <div class="search-results" id="rag-results"></div>
                 </div>
+
+                <!-- Panel 4: Doctrine or Opinion? -->
+                <div class="search-panel" id="doctrine-opinion-panel">
+                    <div class="panel-header">
+                        <h3>⚖️ Doctrine or Opinion?</h3>
+                        <span class="status-badge not-ready" id="doctrine-opinion-status">🔴 Not Ready</span>
+                    </div>
+                    <p class="panel-description">Paste a statement. The app will find relevant talks and tell you whether it aligns more with doctrine/teaching or personal opinion, with quotes.</p>
+                    <div class="panel-input">
+                        <input type="text" id="doctrine-opinion-input" placeholder="e.g. We will see our loved ones again after death..." autocomplete="off" disabled />
+                        <button id="doctrine-opinion-btn" class="btn-primary" disabled>Analyze</button>
+                    </div>
+                    <div class="search-results" id="doctrine-opinion-results"></div>
+                </div>
             </div>
         </div>
     </div>
