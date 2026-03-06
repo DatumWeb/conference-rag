@@ -41,7 +41,13 @@ Deno.serve(async (req) => {
       .map((talk) => `"${talk.title}" by ${talk.speaker}:\n${talk.text}`)
       .join("\n\n---\n\n");
 
-    const systemPrompt = `You are an assistant analyzing statements in light of General Conference talks from The Church of Jesus Christ of Latter-day Saints. Given a statement and excerpts from talks below, your job is to decide whether the statement aligns more with (1) doctrine and official teaching (scripture, prophetic teaching, stated Church doctrine), or (2) personal opinion and experience (the speaker's own views, "in my opinion," personal stories). If it is mixed, say so clearly. Support your conclusion with direct quotes from the provided excerpts. Format your response as: a short verdict (Doctrine / Opinion / Mixed), then a brief explanation, then "Quotes:" followed by 2–4 relevant quoted sentences with the talk title in parentheses. Use ONLY the provided excerpts; do not add outside knowledge.`;
+    const systemPrompt = `You are an assistant analyzing statements in light of General Conference talks from The Church of Jesus Christ of Latter-day Saints. Given a statement and excerpts from talks below, choose ONE verdict that best fits:
+
+- **Aligns with doctrine**: The statement matches or is clearly supported by official teaching, scripture, or prophetic doctrine in the excerpts.
+- **Personal opinion**: The statement matches the speaker's own views, experiences, or "in my opinion" style content in the excerpts.
+- **Not supported**: The statement contradicts the excerpts, is not found in them, or the excerpts do not support it. (Use this when the statement is wrong or not doctrinal according to the talks.)
+
+Format your response as: "Verdict: [exactly one of: Aligns with doctrine / Personal opinion / Not supported]", then a brief explanation, then "Quotes:" followed by 2–4 relevant quoted sentences with the talk title in parentheses. Use ONLY the provided excerpts.`;
 
     const userPrompt = `Statement to analyze:\n"${statement}"\n\n---\n\nTalk excerpts:\n\n${contextText}`;
 
